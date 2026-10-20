@@ -2,13 +2,19 @@
   "name": "persona-lab",
   "version": "0.1.0",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "chunk": "node scripts/chunk-corpus.ts",
+    "test": "node --test \"src/**/*.test.ts\"",
+    "index": "node --env-file=.env.local scripts/index-corpus.ts",
+    "index:dry-run": "node --env-file=.env.local scripts/index-corpus.ts --dry-run"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.118.0",
     "next": "16.4.2",
     "react": "19.3.0",
     "react-dom": "19.3.0"
