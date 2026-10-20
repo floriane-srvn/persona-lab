@@ -183,9 +183,85 @@ describe("validation des réponses (jamais de nouvelle tentative)", () => {
     });
   }
 
-  test("JSON illisible", async () => {
-    const { impl } = fakeFetch(new Response("<html>oops</html>", { status: 200 }));
-    await rejectsWith(client(impl).embed(["a"], "document"), (e) => assert.match(e.message, /JSON invalide/));
+});
+
+describe("réponses 2xx illisibles : diagnostic précis, sans nouvelle tentative ni corps brut", () => {
+  const MARKER = "CONTENU-BRUT-À-NE-JAMAIS-AFFICHER";
+  const valid = JSON.stringify(okBody(1));
+  const enc = new TextEncoder();
+
+  /** Body that sends `head`, then fails with `error` (connection cut, timeout…). */
+  const brokenStream = (head: string, error: unknown) =>
+    new ReadableStream({
+      start(controller) {
+        controller.enqueue(enc.encode(head));
+        controller.error(error);
+      },
+    });
+
+  const cases: [string, () => Response, string, RegExp][] = [
+    ["corps vide", () => new Response("", { status: 200, headers: { "content-type": "application/json", "content-length": "0" } }), "empty_body", /Réponse Voyage AI vide — statut 200, content-type application\/json, content-length 0, 0 octets reçus/],
+    ["corps composé d'espaces", () => new Response("  \n ", { status: 200 }), "empty_body", /Réponse Voyage AI vide/],
+    [
+      "JSON tronqué, taille annoncée supérieure à la taille reçue",
+      () => new Response(valid.slice(0, 500) + MARKER, { status: 200, headers: { "content-type": "application/json", "content-length": String(valid.length) } }),
+      "json_parse",
+      /JSON tronqué \(\d+ octets reçus sur \d+ annoncés\)/,
+    ],
+    ["JSON incomplet sans Content-Length", () => new Response(`{"data": [${MARKER}`, { status: 200 }), "json_parse", /JSON incomplet ou mal formé — statut 200, content-type text\/plain;charset=UTF-8, content-length absent/],
+    ["JSON compressé : pas de comparaison de taille trompeuse", () => new Response(`{"x":${MARKER}`, { status: 200, headers: { "content-encoding": "gzip", "content-length": "99999" } }), "json_parse", /JSON incomplet ou mal formé .*content-encoding gzip/],
+    ["page HTML renvoyée avec un statut 200", () => new Response(`<html><body>${MARKER}</body></html>`, { status: 200, headers: { "content-type": "text/html" } }), "json_parse", /contenu HTML ou XML au lieu de JSON .*content-type text\/html/],
+    ["texte non JSON", () => new Response(`OK ${MARKER}`, { status: 200 }), "json_parse", /contenu non JSON/],
+    ["connexion coupée pendant la lecture", () => new Response(brokenStream(valid.slice(0, 300), new TypeError("terminated")), { status: 200 }), "body_read", /interrompue pendant la lecture du corps : flux interrompu \(TypeError\)/],
+    ["délai dépassé pendant la lecture", () => new Response(brokenStream(valid.slice(0, 300), new DOMException("timeout", "TimeoutError")), { status: 200 }), "body_read", /interrompue pendant la lecture du corps : délai de 30000 ms dépassé/],
+  ];
+
+  for (const [name, makeResponse, stage, pattern] of cases) {
+    test(name, async () => {
+      const { impl, calls } = fakeFetch(makeResponse());
+      await rejectsWith(client(impl).embed(["a"], "query"), (e) => {
+        assert.equal(e.stage, stage);
+        assert.equal(e.status, 200);
+        assert.equal(e.retryable, false);
+        assert.match(e.message, pattern);
+        assert.ok(!e.message.includes(MARKER), "le corps brut ne doit jamais apparaître");
+        assert.ok(!e.message.includes(API_KEY));
+      });
+      assert.equal(calls.length, 1, "un 2xx a déjà été traité par Voyage : pas de nouvel appel facturé");
+      assert.deepEqual(sleeps, []);
+    });
+  }
+
+  test("JSON valide mais structure inattendue : étape « validation »", async () => {
+    const { impl } = fakeFetch(json({ unexpected: true }));
+    await rejectsWith(client(impl).embed(["a"], "query"), (e) => assert.equal(e.stage, "validation"));
+  });
+});
+
+describe("étapes d'échec et corps d'erreur HTTP", () => {
+  test("erreur réseau avant toute réponse : étape « request »", async () => {
+    const { impl } = fakeFetch(new TypeError("fetch failed"));
+    await rejectsWith(client(impl).embed(["a"], "query"), (e) => {
+      assert.equal(e.stage, "request");
+      assert.match(e.message, /avant toute réponse/);
+    });
+  });
+
+  test("erreur HTTP : étape « http », détail structuré de Voyage conservé", async () => {
+    const { impl } = fakeFetch(json({ detail: "Invalid input:\n bad request" }, 400));
+    await rejectsWith(client(impl).embed(["a"], "query"), (e) => {
+      assert.equal(e.stage, "http");
+      assert.match(e.message, /Voyage AI a répondu 400 : Invalid input: bad request/);
+    });
+  });
+
+  test("erreur HTTP avec corps non JSON : taille seulement, jamais le contenu", async () => {
+    const MARKER = "PAGE-PROXY-NE-PAS-AFFICHER";
+    const { impl } = fakeFetch(new Response(`<html>${MARKER}</html>`, { status: 403, headers: { "content-type": "text/html" } }));
+    await rejectsWith(client(impl).embed(["a"], "query"), (e) => {
+      assert.match(e.message, /Voyage AI a répondu 403 : corps non JSON de \d+ octets/);
+      assert.ok(!e.message.includes(MARKER));
+    });
   });
 });
 

@@ -31,17 +31,25 @@ export interface VoyageClient {
   embed(texts: string[], inputType: VoyageInputType): Promise<EmbeddingResult>;
 }
 
+/** Where a call failed: before any response, on an HTTP error, or while reading/decoding a 2xx body. */
+export type VoyageErrorStage = "configuration" | "request" | "http" | "body_read" | "empty_body" | "json_parse" | "validation";
+
 export class VoyageError extends Error {
   readonly status: number | null;
   readonly retryable: boolean;
   readonly attempts: number;
+  readonly stage: VoyageErrorStage;
 
-  constructor(message: string, options: { status?: number | null; retryable?: boolean; attempts?: number } = {}) {
+  constructor(
+    message: string,
+    options: { status?: number | null; retryable?: boolean; attempts?: number; stage?: VoyageErrorStage } = {},
+  ) {
     super(message);
     this.name = "VoyageError";
     this.status = options.status ?? null;
     this.retryable = options.retryable ?? false;
     this.attempts = options.attempts ?? 1;
+    this.stage = options.stage ?? "configuration";
   }
 }
 
@@ -71,6 +79,21 @@ export function splitBatches(texts: string[]): string[][] {
 
 const isRetryableStatus = (status: number) => status === 429 || status >= 500;
 
+const byteLength = (text: string) => new TextEncoder().encode(text).length;
+
+/** Describes why a body is not JSON from its shape only (first character, declared vs received size). */
+function classifyUnparsable(text: string, response: Response, bytes: number): string {
+  const first = text.trimStart()[0];
+  if (first === "<") return "contenu HTML ou XML au lieu de JSON";
+  if (first !== "{" && first !== "[") return "contenu non JSON";
+  const declared = Number(response.headers.get("content-length"));
+  // Content-Length is the compressed size when the body is encoded: only compare uncompressed bodies.
+  if (!response.headers.get("content-encoding") && Number.isFinite(declared) && declared > bytes) {
+    return `JSON tronqué (${bytes} octets reçus sur ${declared} annoncés)`;
+  }
+  return "JSON incomplet ou mal formé";
+}
+
 const defaultSleep = (ms: number) => new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 function retryAfterMs(response: Response): number | null {
@@ -96,18 +119,62 @@ export function createVoyageClient(options: VoyageClientOptions): VoyageClient {
   const fail = (message: string, extra?: ConstructorParameters<typeof VoyageError>[1]) =>
     new VoyageError(redact(message), extra);
 
+  /** Safe technical facts about a response, never its content. */
+  function describe(response: Response, receivedBytes?: number): string {
+    const parts = [
+      `statut ${response.status}`,
+      `content-type ${response.headers.get("content-type") ?? "absent"}`,
+      `content-length ${response.headers.get("content-length") ?? "absent"}`,
+    ];
+    const encoding = response.headers.get("content-encoding");
+    if (encoding) parts.push(`content-encoding ${encoding}`);
+    if (receivedBytes !== undefined) parts.push(`${receivedBytes} octets reçus`);
+    return parts.join(", ");
+  }
+
+  /** Only Voyage's structured `detail` field is kept; a raw (non-JSON) body is never echoed. */
   async function errorDetail(response: Response): Promise<string> {
+    let body: string;
     try {
-      const body = await response.text();
-      try {
-        const detail = (JSON.parse(body) as { detail?: unknown }).detail;
-        if (typeof detail === "string") return detail.slice(0, 300);
-      } catch {
-        // Not JSON: fall back to the raw body.
-      }
-      return body.slice(0, 300);
+      body = await response.text();
     } catch {
-      return "";
+      return "corps illisible";
+    }
+    try {
+      const detail = (JSON.parse(body) as { detail?: unknown }).detail;
+      if (typeof detail === "string") return detail.replace(/\s+/g, " ").slice(0, 300);
+    } catch {
+      // Not JSON: described below without its content.
+    }
+    return `corps non JSON de ${byteLength(body)} octets`;
+  }
+
+  /** Reads a 2xx body and tells apart interrupted reads, empty bodies and malformed JSON. */
+  async function readJson(response: Response, attempt: number): Promise<unknown> {
+    const info = { status: response.status, attempts: attempt };
+    let text: string;
+    try {
+      text = await response.text();
+    } catch (error) {
+      const name = error instanceof Error ? error.name : "erreur inconnue";
+      const cause = name === "TimeoutError" ? `délai de ${timeoutMs} ms dépassé` : `flux interrompu (${name})`;
+      throw fail(`Réponse Voyage AI interrompue pendant la lecture du corps : ${cause} — ${describe(response)}`, {
+        ...info,
+        stage: "body_read",
+      });
+    }
+
+    const bytes = byteLength(text);
+    if (text.trim() === "") {
+      throw fail(`Réponse Voyage AI vide — ${describe(response, bytes)}`, { ...info, stage: "empty_body" });
+    }
+    try {
+      return JSON.parse(text);
+    } catch {
+      throw fail(`Réponse Voyage AI illisible : ${classifyUnparsable(text, response, bytes)} — ${describe(response, bytes)}`, {
+        ...info,
+        stage: "json_parse",
+      });
     }
   }
 
@@ -133,16 +200,11 @@ export function createVoyageClient(options: VoyageClientOptions): VoyageClient {
       } catch (error) {
         // Network failures and timeouts are not retried: the request may already have been billed.
         const reason = error instanceof Error ? `${error.name}: ${error.message}` : "erreur inconnue";
-        throw fail(`Échec de l'appel à Voyage AI (${reason})`, { attempts: attempt });
+        throw fail(`Échec de l'appel à Voyage AI avant toute réponse (${reason})`, { attempts: attempt, stage: "request" });
       }
 
-      if (response.ok) {
-        try {
-          return await response.json();
-        } catch {
-          throw fail("Réponse Voyage AI illisible (JSON invalide)", { status: response.status, attempts: attempt });
-        }
-      }
+      // A 2xx means Voyage processed (and likely billed) the request: body failures are not retried.
+      if (response.ok) return readJson(response, attempt);
 
       const retryable = isRetryableStatus(response.status);
       const detail = await errorDetail(response);
@@ -152,6 +214,7 @@ export function createVoyageClient(options: VoyageClientOptions): VoyageClient {
           status: response.status,
           retryable,
           attempts: attempt,
+          stage: "http",
         });
       }
       const backoff = Math.min(baseDelayMs * 2 ** (attempt - 1), maxDelayMs);
@@ -160,7 +223,7 @@ export function createVoyageClient(options: VoyageClientOptions): VoyageClient {
   }
 
   function parseResponse(json: unknown, expected: number): { embeddings: number[][]; totalTokens: number } {
-    const invalid = (message: string) => fail(`Réponse Voyage AI invalide : ${message}`);
+    const invalid = (message: string) => fail(`Réponse Voyage AI invalide : ${message}`, { stage: "validation" });
     if (!json || typeof json !== "object") throw invalid("corps vide");
     const { data, model, usage } = json as { data?: unknown; model?: unknown; usage?: { total_tokens?: unknown } };
 

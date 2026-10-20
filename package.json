@@ -11,7 +11,8 @@
     "chunk": "node scripts/chunk-corpus.ts",
     "test": "node --test \"src/**/*.test.ts\"",
     "index": "node --env-file=.env.local scripts/index-corpus.ts",
-    "index:dry-run": "node --env-file=.env.local scripts/index-corpus.ts --dry-run"
+    "index:dry-run": "node --env-file=.env.local scripts/index-corpus.ts --dry-run",
+    "search": "node --env-file=.env.local scripts/search.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",
