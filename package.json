@@ -13,7 +13,8 @@
     "index": "node --env-file=.env.local scripts/index-corpus.ts",
     "index:dry-run": "node --env-file=.env.local scripts/index-corpus.ts --dry-run",
     "search": "node --env-file=.env.local scripts/search.ts",
-    "ask": "node --env-file=.env.local scripts/ask.ts"
+    "ask": "node --env-file=.env.local scripts/ask.ts",
+    "reformulate": "node --env-file=.env.local scripts/reformulate.ts"
   },
   "dependencies": {
     "@supabase/supabase-js": "^2.118.0",

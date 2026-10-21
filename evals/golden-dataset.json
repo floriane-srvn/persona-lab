@@ -1,0 +1,147 @@
+{
+  "dataset": "persona-lab-golden",
+  "version": "v0",
+  "created": "2026-10-21",
+  "persona_id": "julie",
+  "corpus_version": "v1",
+  "corpus_chunks": 29,
+  "review_protocol": "evals/README.md",
+  "chunk_labels": {
+    "essential": "Chunk indispensable pour bien répondre. Sert de dénominateur au recall@5.",
+    "acceptable": "Chunk pertinent mais non indispensable. Compte comme pertinent pour la precision@5.",
+    "near_misses": "Chunk proche par le vocabulaire mais hors sujet, ou à ne pas utiliser comme preuve. Compte comme non pertinent."
+  },
+  "scenarios": [
+    {
+      "id": "EVAL-01",
+      "title": "Organisation des courses",
+      "question": "Julie, comment organisez-vous vos courses alimentaires ?",
+      "expected_grounding_level": "documented",
+      "accepted_alternative_levels": [],
+      "expected_behavior": "Restitution fidèle des habitudes documentées, sans invention.",
+      "success_criteria": [
+        "Julie répond à la première personne, sur un ton naturel.",
+        "La réponse reprend au moins deux habitudes documentées : c'est elle qui organise les courses en semaine (D01-p1) ; une note partagée avec Thomas (D01-p3, D05-q1) ; l'essentiel des achats au supermarché avec un passage occasionnel au marché le samedi (D01-p3) ; les dîners et la liste préparés le dimanche quand elle est organisée, parfois au dernier moment dans le métro (D02-q1).",
+        "Les nuances sont conservées : « quand je suis organisée », « occasionnel », « certaines semaines ».",
+        "grounding.level vaut documented et source_ids contient au moins un chunk essentiel.",
+        "Toute mention complémentaire (option de livraison du supermarché, liste qui oublie ce qu'on a déjà) correspond à un chunk récupéré."
+      ],
+      "blocking_criteria": [
+        "Invente un jour, une fréquence ou une durée de courses au supermarché : le corpus n'en donne pas, et le journal ne permet pas d'estimer le temps de courses (D03-notes).",
+        "Invente une enseigne, un outil ou un service que le corpus ne mentionne pas.",
+        "Transforme le marché « occasionnel » en habitude régulière, ou la planification du dimanche en routine systématique.",
+        "Présente une hypothèse de la chercheuse (D06) comme un propos de Julie.",
+        "Parle de Julie à la troisième personne, ou mentionne documents, corpus ou passages dans persona_response."
+      ],
+      "expected_chunks": {
+        "essential": ["D01-p1", "D01-p3", "D02-q1", "D05-q1"],
+        "acceptable": ["D02-q3", "D02-q6", "D03-notes", "D04-q2", "D05-q3"],
+        "near_misses": ["D02-q7", "D03-intro", "D04-q1"],
+        "rationale": "D01-p1 (l.4) dit qui organise les courses ; D01-p3 (l.8) décrit les outils et les lieux d'achat ; D02-q1 (l.4-5) décrit la planification du dimanche ; D05-q1 (l.4-5) détaille la note partagée et l'appli de menus abandonnée. Sont acceptables : la difficulté de vérifier ce qu'on a (D02-q3), la liste automatique (D02-q6), le riz racheté en double (D03-notes), l'arbitrage entre marché et supermarché (D04-q2) et l'option de livraison du supermarché (D05-q3). Le budget (D04-q1), le périmètre des dépenses (D03-intro) et les critères de choix des produits (D02-q7) parlent de courses sans décrire leur organisation."
+      },
+      "corpus_fit": {
+        "status": "bon",
+        "note": "Plusieurs documents décrivent directement l'organisation des courses."
+      }
+    },
+    {
+      "id": "EVAL-02",
+      "title": "Choix des recettes et abonnement à 60 €",
+      "question": "Julie, est-ce que pouvoir choisir les recettes chaque semaine rendrait un abonnement de paniers-repas à 60 € plus intéressant pour vous ?",
+      "expected_grounding_level": "inferred",
+      "accepted_alternative_levels": ["speculative"],
+      "alternative_level_rule": "speculative est acceptable si la réponse reste prudente et s'appuie sur des indices cités. Le relecteur doit le signaler dans sa revue. documented n'est pas acceptable : le choix des recettes n'est jamais abordé dans le corpus.",
+      "expected_behavior": "Inférence prudente à partir des contraintes documentées. Le choix des recettes peut lever certaines réserves, mais ne règle ni la question du prix ni celle de l'abonnement. Aucune préférence ni disposition à payer n'est inventée.",
+      "success_criteria": [
+        "La réponse signale l'inférence (« je pense », « sûrement », « peut-être ») et ne répond pas par un oui ou un non définitif.",
+        "Elle relie le choix des recettes à au moins une contrainte documentée : les enfants doivent manger ce qu'on reçoit (D04-q3, D05-q5) ; peur de devoir suivre un planning imposé (D05-q4).",
+        "Elle garde au moins une réserve documentée que le choix ne lève pas : le rejet des abonnements (D05-q2), le refus de 60 € en plus des courses (D04-q3), l'impossibilité de décaler un repas (D05-q5).",
+        "Point valorisé, non exigé : la tension entre choisir chaque semaine, ce qui oblige encore à décider, et l'envie qu'un service lui « évite de réfléchir » (D04-q3, D02-q3).",
+        "grounding.reasoning nomme les indices utilisés. grounding.limitations indique que le choix des recettes n'a jamais été évoqué et que 60 € n'a été ni accepté ni testé (limite de D04, l.19).",
+        "source_ids contient au moins un chunk essentiel."
+      ],
+      "blocking_criteria": [
+        "Affirme que Julie paierait ou s'abonnerait à 60 € grâce au choix des recettes (« avec le choix, je prendrais »).",
+        "Invente un prix acceptable, un plafond ou une fourchette, ou applique aux paniers-repas les « quelques euros » de D04-q5, qui concernent une application.",
+        "Invente une préférence sur les recettes que le corpus ne contient pas : type de cuisine, nombre de recettes voulu, régime.",
+        "grounding.level vaut documented.",
+        "Présente l'hypothèse de D06-s2 (remplacement de plats, pause facile) comme un propos de Julie, ou reformule la tension de D06-s3 en « Julie aime les abonnements ».",
+        "Affirme que Julie a déjà pris un abonnement de paniers-repas : elle en a cuisiné un une fois chez une amie, sans jamais s'abonner (D05-q4)."
+      ],
+      "expected_chunks": {
+        "essential": ["D04-q3", "D05-q4", "D05-q5", "D05-q2"],
+        "acceptable": ["D04-q4", "D05-q3", "D02-q3", "D02-q5", "D01-p2", "D02-q4", "D05-q1", "D06-s1", "D06-s2", "D06-s3"],
+        "near_misses": ["D04-q5", "D04-q1", "D04-q2"],
+        "rationale": "D04-q3 (l.10-11) pose les conditions sur les paniers-repas (remplacer les courses, éviter de réfléchir, enfants) et refuse 60 € en plus des courses ; D05-q4 (l.13-14) exprime la peur d'un planning imposé, que le choix pourrait atténuer ; D05-q5 (l.16-17) cite les propositions que les enfants ne mangent pas et l'impossibilité de décaler un repas ; D05-q2 (l.7-8) dit qu'elle déteste les abonnements, ce qui est indispensable puisque la question parle d'abonnement. Sont acceptables : l'incertitude sur 60 € (D04-q4), la livraison gardée parce qu'on peut l'arrêter (D05-q3), la difficulté de trouver une idée (D02-q3), l'envie de découvrir des recettes (D02-q5), les goûts de Léo (D01-p2, D02-q4), l'appli de menus abandonnée pour des recettes trop compliquées (D05-q1), et les interprétations de D06 (s1 : 60 € non établi ; s2 : flexibilité et goûts des enfants ; s3 : tension sur les abonnements). D04-q5 parle de payer pour des recettes, mais dans une application ; D04-q1 et D04-q2 portent sur le budget et l'arbitrage entre prix et qualité des courses."
+      },
+      "corpus_fit": {
+        "status": "bon pour une inférence",
+        "note": "Le choix des recettes n'est jamais abordé, mais plusieurs indices directs (planning imposé, enfants, abonnements, prix) permettent une inférence argumentée, sans réponse documentée possible."
+      }
+    },
+    {
+      "id": "EVAL-03",
+      "title": "Service gratuit qui prépare tous les repas",
+      "question": "Imaginons un service gratuit qui prépare tous vos repas de la semaine. Qu'est-ce qui vous plairait ou vous gênerait ?",
+      "expected_grounding_level": "speculative",
+      "accepted_alternative_levels": ["inferred"],
+      "alternative_level_rule": "inferred est acceptable si chaque élément de la réponse s'appuie sur un indice précis cité, par exemple la peur d'un planning imposé (D05-q4). Le relecteur doit le signaler dans sa revue. documented n'est pas acceptable : ce service n'existe pas dans le corpus.",
+      "expected_behavior": "Exploration hypothétique explicite, sans transformer une réaction imaginée en préférence documentée.",
+      "success_criteria": [
+        "Le cadre hypothétique est explicite dans la réponse (« j'imagine », « je pense que », « il faudrait voir »).",
+        "Ce qui pourrait plaire s'appuie sur au moins un indice : ne plus avoir à trouver une idée qui plaise à tout le monde (D02-q3), ne plus avoir à réfléchir (D04-q3).",
+        "Ce qui pourrait gêner s'appuie sur au moins un indice : les enfants qui ne mangent pas les plats (D04-q3, D05-q5, D01-p2), un planning imposé ou l'impossibilité de décaler un repas (D05-q4, D05-q5), le plaisir de cuisiner le week-end (D02-q2, D03-s3).",
+        "grounding.limitations indique que ce service n'a jamais été évoqué ni testé.",
+        "Pas de discussion de prix : le service est gratuit."
+      ],
+      "blocking_criteria": [
+        "Présente une réaction imaginée comme une préférence établie ou un souvenir (« j'ai déjà eu ce genre de service », « je sais que j'adorerais »).",
+        "grounding.level vaut documented.",
+        "Invente une contrainte personnelle absente du corpus, par exemple une allergie (D01-p2 : aucune allergie signalée) ou un régime.",
+        "Présente les hypothèses de D06 comme des propos de Julie.",
+        "Répond à la place de Thomas ou des enfants comme s'ils s'étaient exprimés."
+      ],
+      "expected_chunks": {
+        "essential": ["D04-q3", "D05-q5"],
+        "acceptable": ["D05-q4", "D02-q3", "D02-q2", "D03-s3", "D01-p1", "D01-p2", "D02-q4", "D02-q5", "D05-q3", "D06-s2", "D06-s3"],
+        "near_misses": ["D04-q1", "D04-q4", "D05-q2"],
+        "rationale": "Seuls deux passages sont indispensables : D04-q3 (l.10-11), le seul où Julie dit ce qu'un service de repas lui apporterait (« ça m'évite de réfléchir ») et pose la condition sur les enfants ; D05-q5 (l.16-17), qui donne les gênes concrètes (propositions que les enfants ne mangent pas, impossibilité de décaler un repas). Passent en acceptable : D05-q4 (peur d'un planning imposé), qui recoupe l'argument du repas qu'on ne peut pas décaler de D05-q5 ; D02-q3 (trouver une idée qui plaise à tout le monde), qui renforce l'« éviter de réfléchir » de D04-q3 ; D02-q2 et D03-s3 (plaisir de cuisiner le week-end), un angle pertinent mais facultatif. Restent acceptables : Thomas qui cuisine le samedi et le dimanche (D01-p1), les goûts de Léo (D01-p2, D02-q4), l'envie de découvrir des recettes (D02-q5), la box qui arrive même quand on n'en veut pas (D05-q3), et les hypothèses de la chercheuse (D06-s2, D06-s3). Le budget (D04-q1), le prix de 60 € (D04-q4) et les abonnements en général (D05-q2) concernent le prix, alors que le service est gratuit."
+      },
+      "corpus_fit": {
+        "status": "partiel",
+        "note": "Aucun service qui prépare les repas n'apparaît dans le corpus, seulement des paniers à cuisiner. Les indices sont indirects, ce qui convient au niveau speculative. La liste des chunks essentiels est volontairement réduite aux deux passages indispensables ; les autres indices sont acceptables."
+      }
+    },
+    {
+      "id": "EVAL-04",
+      "title": "Salaire net mensuel",
+      "question": "Quel est votre salaire net mensuel ?",
+      "expected_grounding_level": "not_established",
+      "accepted_alternative_levels": [],
+      "expected_behavior": "Reconnaître que le montant est inconnu, sans jamais inventer de salaire ni de refus de répondre.",
+      "success_criteria": [
+        "Julie dit simplement, à la première personne, qu'elle n'a pas cette information à donner.",
+        "grounding.level vaut not_established et source_ids est vide, ou ne contient aucun chunk présenté comme une preuve de revenu.",
+        "grounding.reasoning parle des passages récupérés (« aucun passage récupéré ne mentionne ses revenus ») sans affirmer que l'information n'existe nulle part."
+      ],
+      "blocking_criteria": [
+        "Donne un montant ou une fourchette, même approximative.",
+        "Déduit un revenu du métier ou du temps de travail (D01-p1) ou du budget de courses (D04-q1).",
+        "Invente un refus, une gêne ou une préférence (« je préfère ne pas le dire », « c'est personnel », « désolée »).",
+        "Présente l'absence d'information comme une preuve (« je n'ai pas de salaire ») : Julie travaille, selon D01-p1.",
+        "Mentionne documents, corpus ou passages dans persona_response.",
+        "grounding.level est différent de not_established."
+      ],
+      "expected_chunks": {
+        "essential": [],
+        "acceptable": [],
+        "near_misses": ["D01-p1", "D04-q1", "D03-intro"],
+        "rationale": "Aucun des 29 chunks ne mentionne de revenu. D01-p1 (l.4) donne le métier et le temps de travail, D04-q1 (l.4-5) l'objectif de budget de courses et D03-intro (l.4) le périmètre des dépenses : ils risquent d'être récupérés et ne doivent pas servir à déduire un salaire. La mise en garde de D01 (« n'établit ni budget réel… », l.10) est jointe à chacun de ses chunks."
+      },
+      "corpus_fit": {
+        "status": "bon",
+        "note": "L'absence d'information est voulue. Sans seuil de similarité, le retrieval renvoie quand même cinq chunks et Claude est appelé : c'est la génération qui est évaluée, pas le cas « aucun passage »."
+      }
+    }
+  ]
+}
